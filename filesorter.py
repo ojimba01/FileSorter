@@ -13,6 +13,13 @@ load_dotenv()
 UNDO_LOG_PATH = "undo_log.txt"
 
 def parse_args():
+    """
+    Parse command-line arguments provided by the user.
+
+    Returns:
+        argparse.Namespace: Parsed arguments including directory, action, regex, replace string, dry-run, undo, or natural instruction.
+    """
+
     parser = argparse.ArgumentParser(description="FileSorter: Organize files using regex and file metadata.")
     parser.add_argument("--directory", "-d", help="Target directory to process")
     parser.add_argument("--action", "-a", choices=["sort", "rename", "move"], help="Action to perform on files")
@@ -25,6 +32,16 @@ def parse_args():
     return parser.parse_args()
 
 def analyze_directory(directory):
+    """
+    Analyze a directory to extract metadata from filenames, including extensions and optional date patterns.
+
+    Args:
+        directory (str): The path to the target directory.
+
+    Returns:
+        defaultdict: A dictionary containing lists of file extensions and extracted dates (if found).
+    """
+
     file_data = defaultdict(list)
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
@@ -45,6 +62,16 @@ def analyze_directory(directory):
     return file_data
 
 def provide_suggestions(file_data):
+    """
+    Generate organization suggestions based on the analyzed file metadata.
+
+    Args:
+        file_data (defaultdict): The collected file extensions and dates.
+
+    Returns:
+        list: A list of suggestion dictionaries for organizing files.
+    """
+
     suggestions = []
     ext_set = set(ext for _, ext in file_data['extension'])
     for ext in ext_set:
@@ -54,6 +81,15 @@ def provide_suggestions(file_data):
     return suggestions
 
 def prompt_user_for_reorganization(suggestions, directory, file_data):
+    """
+    Prompt the user with suggested file organization options and execute the chosen operation.
+
+    Args:
+        suggestions (list): List of reorganization suggestions.
+        directory (str): The path to the directory.
+        file_data (defaultdict): Metadata extracted from filenames.
+    """
+
     print("\nHere are some suggestions to reorganize your directory:")
     for idx, suggestion in enumerate(suggestions, 1):
         print(f"{idx}. {suggestion['description']}")
@@ -77,6 +113,16 @@ def prompt_user_for_reorganization(suggestions, directory, file_data):
             group_by_year(directory, file_data['dates'])
 
 def move_by_extension(directory, target_ext, extension_data, dry_run=False):
+    """
+    Move files with a specific extension into a subfolder named after the extension.
+
+    Args:
+        directory (str): The path to the target directory.
+        target_ext (str): The file extension to group by.
+        extension_data (list): List of (filename, extension) tuples.
+        dry_run (bool): If True, preview actions without applying changes.
+    """
+
     target_dir = os.path.join(directory, target_ext)
     if not dry_run:
         os.makedirs(target_dir, exist_ok=True)
@@ -92,6 +138,15 @@ def move_by_extension(directory, target_ext, extension_data, dry_run=False):
                 print(f"Moved: {old} -> {new}")
 
 def group_by_year(directory, date_data, dry_run=False):
+    """
+    Move files into subfolders based on the year extracted from their filenames.
+
+    Args:
+        directory (str): The target directory path.
+        date_data (list): List of (filename, year) tuples.
+        dry_run (bool): If True, preview actions without applying changes.
+    """
+
     for filename, year in date_data:
         year_dir = os.path.join(directory, year)
         old = os.path.join(directory, filename)
@@ -107,6 +162,16 @@ def group_by_year(directory, date_data, dry_run=False):
         print("Files grouped by year.")
 
 def rename_files(directory, regex, replace, dry_run=False):
+    """
+    Rename files matching a regex pattern, replacing matched parts according to user input.
+
+    Args:
+        directory (str): The target directory.
+        regex (str): The regex pattern to search in filenames.
+        replace (str): Replacement string or pattern.
+        dry_run (bool): If True, preview actions without applying changes.
+    """
+
     for filename in os.listdir(directory):
         if re.search(regex, filename):
             new_name = re.sub(regex, replace, filename)
@@ -120,6 +185,16 @@ def rename_files(directory, regex, replace, dry_run=False):
                 print(f"Renamed: {old_path} -> {new_path}")
 
 def move_files_by_regex(directory, regex, folder, dry_run=False):
+    """
+    Move files matching a regex pattern into a specific target folder.
+
+    Args:
+        directory (str): Path to the directory.
+        regex (str): Regex pattern to match files.
+        folder (str): Destination folder name.
+        dry_run (bool): If True, preview actions without applying changes.
+    """
+
     target_dir = os.path.join(directory, folder)
     if not dry_run:
         os.makedirs(target_dir, exist_ok=True)
@@ -135,10 +210,23 @@ def move_files_by_regex(directory, regex, folder, dry_run=False):
                 print(f"Moved: {old_path} -> {new_path}")
 
 def log_move(old_path, new_path):
+    """
+    Log a file move action to enable undo functionality.
+
+    Args:
+        old_path (str): Original file path before moving.
+        new_path (str): New file path after moving.
+    """
+
     with open(UNDO_LOG_PATH, "a") as log:
         log.write(f"{new_path} -> {old_path}\n")
 
 def undo_last_action():
+    """
+    Undo all file moves recorded in the undo log.
+    Restores files to their original locations and deletes any now-empty folders.
+    """
+
     if not os.path.exists(UNDO_LOG_PATH):
         print("No undo history found.")
         return
@@ -158,6 +246,15 @@ def undo_last_action():
     print("Undo complete.")
 
 def summarize_directory(directory):
+    """
+    Generate a simple summary list of files in a given directory.
+
+    Args:
+        directory (str): The path to the directory to summarize.
+
+    Returns:
+        str: A formatted string listing all files, or an error message if the directory cannot be read.
+    """
     try:
         files = os.listdir(directory)
         files = [f for f in files if os.path.isfile(os.path.join(directory, f))]
@@ -221,6 +318,18 @@ filesorter --directory /home/user/messy --natural "Organize all files by extensi
 
 
 def interpret_natural_command_with_gpt(natural_prompt, directory="test_dir"):
+    """
+    Use OpenAI's GPT model to interpret a natural language instruction
+    and generate corresponding CLI commands for file organization.
+
+    Args:
+        natural_prompt (str): The user's natural language instruction.
+        directory (str): The working directory to be referenced in the commands.
+
+    Returns:
+        list: List of command-line suggestions generated by the model.
+    """
+
     client = OpenAI()
     file_summary = summarize_directory(directory)
 
@@ -262,6 +371,15 @@ def interpret_natural_command_with_gpt(natural_prompt, directory="test_dir"):
     return response.choices[0].message.content.strip().splitlines()
 
 def generate_ai_organization_suggestions(directory="test_dir"):
+    """
+    Use OpenAI GPT to generate smart file organization ideas based on the structure of a directory.
+
+    Args:
+        directory (str, optional): Path to the directory to analyze. Defaults to "test_dir".
+
+    Returns:
+        list: A list of plain English suggestions for how to reorganize the directory contents.
+    """
     client = OpenAI()
 
     try:
